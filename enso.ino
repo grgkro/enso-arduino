@@ -27,7 +27,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
-BLECharacteristic* pCharacteristic2 = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 uint32_t value2 = 14;
@@ -35,25 +34,16 @@ long randNumber;
 
 class MyServerCallbacks: public BLEServerCallbacks {
 
-
-  
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
        Serial.println("connected");
-       openDoorWithServo();
-       testscrolltext("VERBUNDEN");
+       testscrolltext("VERBUNDEN");       
     };
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
        Serial.println("disconnected");
        testscrolltext("GETRENNT");
-    }
-
-    void sendRandomNumber() {
-      // print a random number from 0 to 999_999
-      randNumber = random(1000000);
-      Serial.println(randNumber);
     }
     
     void testscrolltext(String text) {
@@ -153,7 +143,7 @@ long generateRandomNumber() {
    randomSeed(analogRead(0));
       // print a random number from 0 to 999_999
       randNumber = random(1000000);
-      Serial.println(randNumber);
+      // Serial.println(randNumber);
       return randNumber;
    }
 
@@ -174,26 +164,23 @@ for(int c = 0; c <= 6; c++) {
       return result;
    }
 
-String encrypt(long seed){
+String encrypt(String nonce){
 
-  String s1 = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-  String s2 = "#######";
-  String s3 = String(seed);
-  bool b = s1.concat(s2);
-  bool b2 = s1.concat(s3);  
-  Serial.println(s1);
+  String s1 = "elPalitoBoxUniquePasswort";
+  bool b = s1.concat(nonce);  
+  //Serial.println(s1);
 
   char payload[50];
   s1.toCharArray(payload, 50);
 
-  Serial.println(payload);
+  //Serial.println(payload);
   byte shaResult[32];
  
   mbedtls_md_context_t ctx;
   mbedtls_md_type_t md_type = MBEDTLS_MD_SHA256;
  
   const size_t payloadLength = strlen(payload);
- 
+
   mbedtls_md_init(&ctx);
   mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 0);
   mbedtls_md_starts(&ctx);
@@ -211,24 +198,16 @@ String encrypt(long seed){
   return result;
 }
 
-union {
-    char myByte[4];
-    long mylong;
-} foo;
-
-void sendRandomNumber() {
-  if (deviceConnected) {
-    String nonce = generateRandomString();
-    Serial.println("nonce String: " + nonce); 
+String sendNonce() {
+  String nonce = generateRandomString();
     
-    // myUnion.myLong = 1234L;
+    Serial.println("nonce String: " + nonce); 
 
     pCharacteristic->setValue(nonce.c_str());
        pCharacteristic->notify();
-       // value++;
-       delay(5); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
-  }
-  
+    delay(4); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
+
+  return nonce;
 }
     
 void setup() {
@@ -260,25 +239,36 @@ if (bootCount == 0) {
   startBLEServer();
 }
 
+bool nonceSend = false;
+String nonce = "";
+String shaResult = "";
+bool boxIsOpen = false;
+
 void loop() {
   if(firstLoop) {
     Serial.println("looping!");
     firstLoop = false;
   }
 
-sendRandomNumber();
-
-
-    if (deviceConnected) {
-    pCharacteristic2->setValue((uint8_t*)&value2, 1);
-   pCharacteristic2->notify();
-  delay(30);
+  if (!nonceSend && deviceConnected) {
+      nonce = sendNonce();
+      nonceSend = true;
+      shaResult = encrypt(nonce);
+ Serial.println("gotsha: " + shaResult); 
   }
 
-  String shaResult2 = encrypt(generateRandomNumber());
-  Serial.println("gotsha: " + shaResult2); 
+  std::string rxValue = pCharacteristic->getValue();
+      Serial.print("characteristic !!!!!!!!!!! value received in loop = ");
+      Serial.println(rxValue.c_str());
 
-  delay(1500);
+if(String(rxValue.c_str()) == "response" && !boxIsOpen) {  // "response" should be shaResult
+  openDoorWithServo();
+  showText("GEÖFFNET");
+  // boxIsOpen = true;  
+}
+delay(2000);
+
+   
    
 }
 
@@ -307,20 +297,6 @@ void startBLEServer() {
   // Create a BLE Descriptor
   pCharacteristic->addDescriptor(new BLE2902());
 
-  // Create a BLE Characteristic
-  pCharacteristic2 = pService->createCharacteristic(
-                      CHARACTERISTIC_UUID2,
-                      BLECharacteristic::PROPERTY_READ   |
-                      BLECharacteristic::PROPERTY_WRITE  |
-                      BLECharacteristic::PROPERTY_NOTIFY |
-                      BLECharacteristic::PROPERTY_INDICATE
-                    );
-
-  pCharacteristic2->setValue("Hello World says Neil again");
-
-  // Create a BLE Descriptor
-  pCharacteristic2->addDescriptor(new BLE2902());
-
   // Start the service
   pService->start();
 
@@ -333,8 +309,8 @@ void startBLEServer() {
   BLEDevice::startAdvertising();
   Serial.println("Characteristic defined! Now you can read it in your phone!");
   Serial.println("Waiting a client connection to notify...");
-
 }
+
 
 
 void showEnsoLogo(void) {
