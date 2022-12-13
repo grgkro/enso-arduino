@@ -336,30 +336,51 @@ void loop()
     firstLoop = false;
   }
 
-  if (!nonceSend && deviceConnected)
+  // if (!nonceSend && deviceConnected)
+  // {
+  //   nonce = sendNonce();
+  //   nonceSend = true;
+  //   shaResult = encrypt(nonce);
+  //   Serial.println("gotsha: " + shaResult);
+  // }
+
+  if (deviceConnected)
   {
-    nonce = sendNonce();
-    nonceSend = true;
-    shaResult = encrypt(nonce);
-    Serial.println("gotsha: " + shaResult);
-  }
+    std::string statusRxValue = pCharacteristic->getValue();
+    Serial.print("characteristic !!!!!!!!!!! value read in loop = ");
+    Serial.println(statusRxValue.c_str());
+    // showText(String(statusRxValue.c_str()));
 
-  std::string rxValue = pCharacteristic->getValue();
-  Serial.print("characteristic !!!!!!!!!!! value read in loop = ");
-  Serial.println(rxValue.c_str());
+    if (String(statusRxValue.c_str()) == "init_rent_out")
+    {
+      showText("init rent");
+      //TODO: generate code
+      currentStatus = "sending_code_challenge";
+      pCharacteristic->setValue(currentStatus.c_str());
+      pCharacteristic->notify();
+      delay(4);
+    }
+    else if (String(statusRxValue.c_str()) == "sending_hash")
+    {
+      showText("got hash");
 
-if (String(rxValue.c_str()) == "init_rent_out")
-  { // "response" should be shaResult
-  
-  // if (String(rxValue.c_str()) == "response" && !boxIsOpen)
-  if (String(rxValue.c_str()) == "response" && !boxIsOpen)
-  { // "response" should be shaResult
-    openDoor();
-    //   openDoorWithServo();
-    showText("GEÖFFNET");
-    boxIsOpen = true;
+      std::string hashRxValue = pCharacteristic5->getValue();
+      Serial.print("hashRxValue value read in loop = ");
+      Serial.println(hashRxValue.c_str());
+      if (String(hashRxValue.c_str()) == "testHash")
+      {
+        Serial.print("hash is correct");
+        if (!boxIsOpen)
+        {
+          openDoor();
+          //   openDoorWithServo();
+          showText("GEÖFFNET");
+          boxIsOpen = true;
+        }
+      }
+    }
   }
-  delay(2000);
+  delay(500);
 }
 // ##########################################################################################################
 // ##########################################################################################################
@@ -389,7 +410,7 @@ void startBLEServer()
           BLECharacteristic::PROPERTY_NOTIFY |
           BLECharacteristic::PROPERTY_INDICATE);
 
-  pCharacteristic->setValue(initialStatus);
+  pCharacteristic->setValue(initialStatus.c_str());
 
   // // Create a BLE Descriptor
   pCharacteristic->addDescriptor(new BLE2902());
