@@ -41,6 +41,7 @@ uint32_t value2 = 14;
 long randNumber;
 String initialStatus = "waiting_for_rental_init";
 static const int servoPin = 4;
+//static const int servoPin = 14;
 
 Servo servo1;
 
@@ -256,7 +257,9 @@ void setup()
   Serial.begin(115200);
   Serial.print("HELLLLLLLLLLLLLLLLOOOOOOOOOOOOOOOOOOOOO");
   pinMode(servoPin, OUTPUT);
-
+  pinMode(5, INPUT);  // Setzt den PIN mit der Nummer PIN_NUMBER als Eingang
+  pinMode(16, INPUT);
+  
   // openDoorWithServo();
   //  SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS))
@@ -330,6 +333,12 @@ String currentStatus = initialStatus;
 // ##########################################################################################################
 void loop()
 {
+  int feedbackLock1 = digitalRead(5);  // Liest den aktuellen Wert des Pins aus
+  Serial.print("current feedbackLock1: ");
+  Serial.println(feedbackLock1);
+  int feedbackLock2 = digitalRead(16);
+  Serial.print("current feedbackLock2: ");
+  Serial.println(feedbackLock2);
   if (firstLoop)
   {
     Serial.println("looping!");
@@ -355,7 +364,7 @@ void loop()
     {
       showText("init rent");
       //TODO: generate code
-      currentStatus = "sending_code_challenge";
+      currentStatus = "sending_code";
       pCharacteristic->setValue(currentStatus.c_str());
       pCharacteristic->notify();
       delay(4);
@@ -380,7 +389,7 @@ void loop()
       }
     }
   }
-  delay(500);
+  delay(1000);
 }
 // ##########################################################################################################
 // ##########################################################################################################
