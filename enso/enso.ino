@@ -40,8 +40,11 @@ bool oldDeviceConnected = false;
 uint32_t value2 = 14;
 long randNumber;
 String initialStatus = "waiting_for_rental_init";
-static const int servoPin = 4;
-//static const int servoPin = 14;
+static const int outputPinOpenDoorLock1 = 4;
+static const int outputPinOpenDoorLock2 = 14;
+static const int inputPinDoorStatus1 = 5;
+static const int inputPinDoorStatus2 = 16;
+String currentStatus = initialStatus;
 
 Servo servo1;
 
@@ -255,10 +258,11 @@ String sendNonce()
 void setup()
 {
   Serial.begin(115200);
-  Serial.print("HELLLLLLLLLLLLLLLLOOOOOOOOOOOOOOOOOOOOO");
-  pinMode(servoPin, OUTPUT);
-  pinMode(5, INPUT);  // Setzt den PIN mit der Nummer PIN_NUMBER als Eingang
-  pinMode(16, INPUT);
+  Serial.print("Starting Setup...");
+  pinMode(outputPinOpenDoorLock1, OUTPUT);
+  pinMode(outputPinOpenDoorLock2, OUTPUT);
+  pinMode(inputPinDoorStatus1, INPUT);  // Setzt den PIN mit der Nummer PIN_NUMBER als Eingang
+  pinMode(inputPinDoorStatus2, INPUT);
   
   // openDoorWithServo();
   //  SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
@@ -294,19 +298,30 @@ String nonce = "";
 String shaResult = "";
 bool boxIsOpen = false;
 
-void openDoor()
+void openDoor(int outputPinDoorLock)
 {
-
-  digitalWrite(servoPin, HIGH); // turn the LED on (HIGH is the voltage level)
-  Serial.println("Wakeup caused by external signal using RTC_IO");
+  digitalWrite(outputPinDoorLock, HIGH); // turn the LED on (HIGH is the voltage level)
+  int feedbackLock1 = digitalRead(inputPinDoorStatus1);  // Liest den aktuellen Wert des Pins aus
+  Serial.println("current feedbackLock1: ");
+  Serial.print(feedbackLock1);
+  int feedbackLock2 = digitalRead(inputPinDoorStatus2);
+  Serial.println("current feedbackLock2: ");
+  Serial.print(feedbackLock2);
   delay(200);                  // wait for a second
-  digitalWrite(servoPin, LOW); // turn the LED off by making the voltage LOW
-  delay(500);
+  digitalWrite(outputPinDoorLock, LOW); // turn the LED off by making the voltage LOW
+  delay(2000);
+  Serial.println("Opened the door at outputPinDoorLock:");
+  Serial.print(outputPinDoorLock);
+  currentStatus = "box_is_open";
+      pCharacteristic->setValue(currentStatus.c_str());
+      pCharacteristic->notify();
+      delay(4);
 }
+
 
 void openDoorWithServo()
 {
-  servo1.attach(servoPin);
+  servo1.attach(outputPinOpenDoorLock1);
 
   for (int posDegrees = -10; posDegrees <= 40; posDegrees++)
   {
@@ -325,7 +340,7 @@ void openDoorWithServo()
   }
 }
 
-String currentStatus = initialStatus;
+
 // ##########################################################################################################
 // ##########################################################################################################
 // ############################### LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOP ########################################
@@ -333,12 +348,13 @@ String currentStatus = initialStatus;
 // ##########################################################################################################
 void loop()
 {
-  int feedbackLock1 = digitalRead(5);  // Liest den aktuellen Wert des Pins aus
+  int feedbackLock1 = digitalRead(inputPinDoorStatus1);  // Liest den aktuellen Wert des Pins aus
   Serial.print("current feedbackLock1: ");
   Serial.println(feedbackLock1);
-  int feedbackLock2 = digitalRead(16);
+  int feedbackLock2 = digitalRead(inputPinDoorStatus2);
   Serial.print("current feedbackLock2: ");
   Serial.println(feedbackLock2);
+
   if (firstLoop)
   {
     Serial.println("looping!");
@@ -356,6 +372,7 @@ void loop()
   if (deviceConnected)
   {
     std::string statusRxValue = pCharacteristic->getValue();
+    std::string statusRxValue = pCharacteristic2->getValue();
     Serial.print("characteristic !!!!!!!!!!! value read in loop = ");
     Serial.println(statusRxValue.c_str());
     // showText(String(statusRxValue.c_str()));
@@ -381,7 +398,7 @@ void loop()
         Serial.print("hash is correct");
         if (!boxIsOpen)
         {
-          openDoor();
+          openDoor(outputPinOpenDoorLock1);
           //   openDoorWithServo();
           showText("GEÖFFNET");
           boxIsOpen = true;
@@ -390,6 +407,9 @@ void loop()
     }
   }
   delay(1000);
+  //openDoor(outputPinOpenDoorLock1);
+  //delay(3000);
+  //openDoor(outputPinOpenDoorLock2);
 }
 // ##########################################################################################################
 // ##########################################################################################################
